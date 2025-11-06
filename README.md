@@ -26,3 +26,4 @@
 ## Деплой
 
 Просто загрузите файлы на GitHub Pages!
+# pelikan-admin
