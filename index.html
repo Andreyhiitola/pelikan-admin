@@ -24,6 +24,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
         
         .header-left h1 {
@@ -44,6 +46,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            font-size: 1rem;
         }
         
         .btn-token:hover {
@@ -66,6 +69,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
         
         .token-setup strong {
@@ -124,6 +129,8 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
         
         .editor-header h2 {
@@ -188,6 +195,10 @@
             color: white;
         }
         
+        .btn-success:hover {
+            background: #059669;
+        }
+        
         .status {
             padding: 1rem;
             border-radius: 8px;
@@ -222,6 +233,21 @@
             font-size: 0.9rem;
             color: #6b7280;
         }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .header-left h1 {
+                font-size: 1.5rem;
+            }
+            
+            .tabs {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -236,7 +262,7 @@
     <div class="container">
         <div class="token-setup" id="tokenSetup">
             <p><strong>⚠️ Настройка доступа:</strong> Нажмите кнопку "Настроить токен" для ввода GitHub Personal Access Token</p>
-            <button class="btn btn-primary" onclick="document.getElementById('tokenBtn').click()">Настроить</button>
+            <button class="btn btn-primary" onclick="document.getElementById('tokenBtn').click()">Настроить сейчас</button>
         </div>
         
         <div class="tabs" id="tabs">
@@ -246,7 +272,7 @@
         <div class="editor-section">
             <div class="editor-header">
                 <h2 id="sectionTitle">Выберите раздел</h2>
-                <button class="btn btn-success" id="formatBtn">Форматировать JSON</button>
+                <button class="btn btn-success" id="formatBtn">✨ Форматировать JSON</button>
             </div>
             
             <textarea id="editor" class="editor" placeholder="Выберите раздел для редактирования..."></textarea>
@@ -259,11 +285,15 @@
             <div class="status" id="status"></div>
             
             <div class="help-text">
-                <strong>Инструкция:</strong><br>
-                1. Настройте GitHub токен (кнопка вверху)<br>
+                <strong>📖 Инструкция:</strong><br>
+                1. Настройте GitHub токен (кнопка в шапке)<br>
                 2. Выберите раздел для редактирования<br>
-                3. Отредактируйте JSON<br>
-                4. Нажмите "Сохранить изменения"
+                3. Отредактируйте JSON данные<br>
+                4. Нажмите "Сохранить изменения"<br>
+                <br>
+                <strong>Создание токена:</strong><br>
+                GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token<br>
+                Выберите права: <strong>repo</strong> (полный доступ к репозиториям)
             </div>
         </div>
     </div>
@@ -274,9 +304,15 @@
         let currentSection = null;
         let githubToken = localStorage.getItem('github_token') || '';
         
-        // Генерация вкладок
+        // Генерация вкладок из config.js
         function generateTabs() {
             const tabsContainer = document.getElementById('tabs');
+            
+            if (!CONFIG || !CONFIG.sections) {
+                tabsContainer.innerHTML = '<p style="color: red;">Ошибка: config.js не загружен</p>';
+                return;
+            }
+            
             tabsContainer.innerHTML = CONFIG.sections.map(section => `
                 <div class="tab" data-section="${section.id}">
                     <div class="tab-title">${section.name}</div>
@@ -284,7 +320,7 @@
                 </div>
             `).join('');
             
-            // Обработчики кликов
+            // Обработчики кликов на вкладки
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.addEventListener('click', () => {
                     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -295,13 +331,27 @@
             });
         }
         
-        // Настройка токена через кнопку
+        // Настройка токена
         document.getElementById('tokenBtn').addEventListener('click', () => {
-            const token = prompt('Введите GitHub Personal Access Token:\n\nСоздайте токен:\nGitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)\n\nРазрешения: repo (полный доступ)');
+            const instructions = `Введите GitHub Personal Access Token:
+
+Как создать токен:
+1. Откройте: github.com/settings/tokens
+2. Generate new token (classic)
+3. Название: Pelikan Admin
+4. Срок: No expiration
+5. Права: ✓ repo (все подпункты)
+6. Generate token
+7. Скопируйте токен
+
+Вставьте токен ниже:`;
+            
+            const token = prompt(instructions);
+            
             if (token && token.trim()) {
                 githubToken = token.trim();
                 localStorage.setItem('github_token', githubToken);
-                showStatus('✅ Токен сохранён!', 'success');
+                showStatus('✅ Токен сохранён успешно!', 'success');
                 document.getElementById('tokenSetup').style.display = 'none';
                 if (currentSection) loadSection(currentSection);
             }
@@ -310,7 +360,7 @@
         // Загрузка раздела
         async function loadSection(sectionId) {
             if (!githubToken) {
-                showStatus('⚠️ Настройте GitHub токен', 'error');
+                showStatus('⚠️ Сначала настройте GitHub токен', 'error');
                 document.getElementById('tokenSetup').style.display = 'flex';
                 return;
             }
@@ -318,11 +368,14 @@
             const editor = document.getElementById('editor');
             const sectionConfig = CONFIG.sections.find(s => s.id === sectionId);
             
-            if (!sectionConfig) return;
+            if (!sectionConfig) {
+                showStatus('❌ Раздел не найден', 'error');
+                return;
+            }
             
             document.getElementById('sectionTitle').textContent = sectionConfig.name;
-            editor.value = '⏳ Загрузка...';
-            showStatus('⏳ Загрузка данных...', 'info');
+            editor.value = '⏳ Загрузка данных...';
+            showStatus('⏳ Загрузка данных из GitHub...', 'info');
             
             const repo = CONFIG.repos[sectionConfig.repo];
             const path = `${CONFIG.contentPath}/${sectionConfig.file}`;
@@ -337,7 +390,9 @@
                 
                 if (!response.ok) {
                     if (response.status === 401) {
-                        throw new Error('Неправильный токен. Создайте новый токен с правами "repo"');
+                        throw new Error('Токен недействителен. Создайте новый токен с правами "repo"');
+                    } else if (response.status === 404) {
+                        throw new Error('Файл не найден: ' + path);
                     }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
@@ -346,11 +401,11 @@
                 const content = decodeURIComponent(escape(atob(data.content)));
                 editor.value = JSON.stringify(JSON.parse(content), null, 2);
                 editor.dataset.sha = data.sha;
-                showStatus('✅ Данные загружены', 'success');
+                showStatus('✅ Данные успешно загружены', 'success');
             } catch (error) {
-                showStatus('❌ Ошибка: ' + error.message, 'error');
+                showStatus('❌ Ошибка загрузки: ' + error.message, 'error');
                 editor.value = '';
-                console.error(error);
+                console.error('Ошибка загрузки:', error);
             }
         }
         
@@ -362,7 +417,7 @@
                 editor.value = JSON.stringify(parsed, null, 2);
                 showStatus('✅ JSON отформатирован', 'success');
             } catch (error) {
-                showStatus('❌ Ошибка: Невалидный JSON', 'error');
+                showStatus('❌ Ошибка: Невалидный JSON. Проверьте синтаксис.', 'error');
             }
         });
         
@@ -374,7 +429,7 @@
             }
             
             if (!currentSection) {
-                showStatus('⚠️ Выберите раздел', 'error');
+                showStatus('⚠️ Выберите раздел для сохранения', 'error');
                 return;
             }
             
@@ -383,11 +438,11 @@
             const repo = CONFIG.repos[sectionConfig.repo];
             const path = `${CONFIG.contentPath}/${sectionConfig.file}`;
             
-            showStatus('⏳ Сохранение...', 'info');
+            showStatus('⏳ Сохранение изменений...', 'info');
             
             try {
-                // Проверка валидности JSON
-                JSON.parse(editor.value);
+                // Проверка валидности JSON перед сохранением
+                const parsedData = JSON.parse(editor.value);
                 
                 const response = await fetch(`${GITHUB_API}/repos/${repo}/contents/${path}`, {
                     method: 'PUT',
@@ -409,19 +464,25 @@
                 
                 const data = await response.json();
                 editor.dataset.sha = data.content.sha;
-                showStatus('✅ Изменения сохранены! Сайт обновится автоматически.', 'success');
+                showStatus('✅ Изменения сохранены! Сайт обновится автоматически через 1-2 минуты.', 'success');
             } catch (error) {
-                showStatus('❌ Ошибка: ' + error.message, 'error');
-                console.error(error);
+                if (error instanceof SyntaxError) {
+                    showStatus('❌ Ошибка: Невалидный JSON. Проверьте синтаксис.', 'error');
+                } else {
+                    showStatus('❌ Ошибка сохранения: ' + error.message, 'error');
+                }
+                console.error('Ошибка сохранения:', error);
             }
         });
         
-        // Перезагрузка
+        // Перезагрузка данных
         document.getElementById('reloadBtn').addEventListener('click', () => {
             if (currentSection) {
-                loadSection(currentSection);
+                if (confirm('Перезагрузить данные? Несохранённые изменения будут потеряны.')) {
+                    loadSection(currentSection);
+                }
             } else {
-                showStatus('⚠️ Выберите раздел', 'error');
+                showStatus('⚠️ Выберите раздел для перезагрузки', 'error');
             }
         });
         
@@ -438,12 +499,14 @@
             }
         }
         
-        // Инициализация
-        generateTabs();
-        
-        if (githubToken) {
-            document.getElementById('tokenSetup').style.display = 'none';
-        }
+        // Инициализация при загрузке страницы
+        window.addEventListener('DOMContentLoaded', () => {
+            generateTabs();
+            
+            if (githubToken) {
+                document.getElementById('tokenSetup').style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
