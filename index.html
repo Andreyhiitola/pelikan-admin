@@ -21,15 +21,34 @@
             color: white;
             padding: 2rem;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
-        .header h1 {
+        .header-left h1 {
             font-size: 2rem;
             margin-bottom: 0.5rem;
         }
         
-        .header p {
+        .header-left p {
             opacity: 0.9;
+        }
+        
+        .btn-token {
+            padding: 12px 24px;
+            background: white;
+            color: #3b82f6;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-token:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
         }
         
         .container {
@@ -44,6 +63,9 @@
             border-radius: 12px;
             margin-bottom: 2rem;
             border-left: 4px solid #f59e0b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .token-setup strong {
@@ -204,15 +226,17 @@
 </head>
 <body>
     <div class="header">
-        <div class="container">
+        <div class="header-left">
             <h1>🐦 Админ-панель Пеликан Алаколь</h1>
-            <p>Управление контентом сайта и приложения</p>
+            <p>Управление контентом сайта</p>
         </div>
+        <button class="btn-token" id="tokenBtn">🔑 Настроить токен</button>
     </div>
     
     <div class="container">
         <div class="token-setup" id="tokenSetup">
-            <p><strong>⚠️ Настройка доступа:</strong> Нажмите <kbd>Ctrl+K</kbd> для ввода GitHub Personal Access Token</p>
+            <p><strong>⚠️ Настройка доступа:</strong> Нажмите кнопку "Настроить токен" для ввода GitHub Personal Access Token</p>
+            <button class="btn btn-primary" onclick="document.getElementById('tokenBtn').click()">Настроить</button>
         </div>
         
         <div class="tabs" id="tabs">
@@ -235,10 +259,11 @@
             <div class="status" id="status"></div>
             
             <div class="help-text">
-                <strong>Горячие клавиши:</strong><br>
-                • <kbd>Ctrl+K</kbd> - Настройка GitHub токена<br>
-                • <kbd>Ctrl+S</kbd> - Сохранить изменения<br>
-                • <kbd>Ctrl+R</kbd> - Перезагрузить данные
+                <strong>Инструкция:</strong><br>
+                1. Настройте GitHub токен (кнопка вверху)<br>
+                2. Выберите раздел для редактирования<br>
+                3. Отредактируйте JSON<br>
+                4. Нажмите "Сохранить изменения"
             </div>
         </div>
     </div>
@@ -270,37 +295,23 @@
             });
         }
         
-        // Настройка токена
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'k') {
-                e.preventDefault();
-                const token = prompt('Введите GitHub Personal Access Token:\n\nСоздайте токен: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)\nРазрешения: repo (полный доступ)');
-                if (token) {
-                    githubToken = token;
-                    localStorage.setItem('github_token', token);
-                    showStatus('✅ Токен сохранён!', 'success');
-                    document.getElementById('tokenSetup').style.display = 'none';
-                    if (currentSection) loadSection(currentSection);
-                }
-            }
-            
-            // Ctrl+S - Сохранить
-            if (e.ctrlKey && e.key === 's') {
-                e.preventDefault();
-                document.getElementById('saveBtn').click();
-            }
-            
-            // Ctrl+R - Перезагрузить
-            if (e.ctrlKey && e.key === 'r') {
-                e.preventDefault();
-                document.getElementById('reloadBtn').click();
+        // Настройка токена через кнопку
+        document.getElementById('tokenBtn').addEventListener('click', () => {
+            const token = prompt('Введите GitHub Personal Access Token:\n\nСоздайте токен:\nGitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)\n\nРазрешения: repo (полный доступ)');
+            if (token && token.trim()) {
+                githubToken = token.trim();
+                localStorage.setItem('github_token', githubToken);
+                showStatus('✅ Токен сохранён!', 'success');
+                document.getElementById('tokenSetup').style.display = 'none';
+                if (currentSection) loadSection(currentSection);
             }
         });
         
         // Загрузка раздела
         async function loadSection(sectionId) {
             if (!githubToken) {
-                showStatus('⚠️ Настройте GitHub токен (Ctrl+K)', 'error');
+                showStatus('⚠️ Настройте GitHub токен', 'error');
+                document.getElementById('tokenSetup').style.display = 'flex';
                 return;
             }
             
@@ -325,6 +336,9 @@
                 });
                 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('Неправильный токен. Создайте новый токен с правами "repo"');
+                    }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
@@ -334,7 +348,7 @@
                 editor.dataset.sha = data.sha;
                 showStatus('✅ Данные загружены', 'success');
             } catch (error) {
-                showStatus('❌ Ошибка загрузки: ' + error.message, 'error');
+                showStatus('❌ Ошибка: ' + error.message, 'error');
                 editor.value = '';
                 console.error(error);
             }
@@ -355,7 +369,7 @@
         // Сохранение изменений
         document.getElementById('saveBtn').addEventListener('click', async () => {
             if (!githubToken) {
-                showStatus('⚠️ Настройте GitHub токен (Ctrl+K)', 'error');
+                showStatus('⚠️ Настройте GitHub токен', 'error');
                 return;
             }
             
@@ -397,7 +411,7 @@
                 editor.dataset.sha = data.content.sha;
                 showStatus('✅ Изменения сохранены! Сайт обновится автоматически.', 'success');
             } catch (error) {
-                showStatus('❌ Ошибка сохранения: ' + error.message, 'error');
+                showStatus('❌ Ошибка: ' + error.message, 'error');
                 console.error(error);
             }
         });
